@@ -3,6 +3,7 @@ AgriMitra Agentic Prototype - LangGraph Workflow
 """
 import json
 import logging
+import re
 from typing import Dict, Any, List, Optional, TypedDict
 from langgraph.graph import StateGraph, END
 from agents import ReasonerNode, DiseaseAgentNode, PriceAgentNode, SchemeAgentNode, CoordinatorNode, BuyerConnectAgentNode,SchemeAgentNode
@@ -266,40 +267,63 @@ class AgriMitraWorkflow:
             reasoner_data = state.get("reasoner_output", {})
             
             # Extract crop from user input first (for price queries, user specifies the crop)
-            # Look for price-related queries with crop names
+            # Look for price-related queries with known crop names, then try simple regex
             crop = None
             from config import MOCK_PRICE_DATA
             for crop_name in MOCK_PRICE_DATA.keys():
-                # Check if crop is mentioned near price-related keywords
+                # Only match whole-word crop names to avoid false positives such as
+                # "rice" matching inside the word "price".
                 crop_lower = crop_name.lower()
+                if not re.search(r"\b" + re.escape(crop_lower) + r"\b", user_input):
+                    continue
+
+                # Check if crop is mentioned near price-related keywords
                 price_keywords = ['price', 'cost', 'rate', 'market', 'value', 'mandi']
-                
-                # Find position of crop and price keywords
                 crop_pos = user_input.find(crop_lower)
-                if crop_pos != -1:
-                    # Check if there's a price keyword nearby (within 30 chars)
-                    for keyword in price_keywords:
-                        keyword_pos = user_input.find(keyword)
-                        if keyword_pos != -1:
-                            # If crop appears near price keyword, use it
-                            if abs(crop_pos - keyword_pos) < 50:
-                                crop = crop_name
-                                break
-                    if crop:
+                for keyword in price_keywords:
+                    keyword_pos = user_input.find(keyword)
+                    if keyword_pos != -1 and abs(crop_pos - keyword_pos) < 50:
+                        crop = crop_name
                         break
-            
-            # Fallback to reasoner's crop if not found in user input
+                if crop:
+                    break
+
+            # If still no crop, try regex patterns like "price of carrots" or "carrot price"
+            if not crop:
+                m = re.search(r'price(?: of)?\s+([a-zA-Z]+)', user_input)
+                if m:
+                    crop = m.group(1).lower()
+                else:
+                    m2 = re.search(r'([a-zA-Z]+)\s+price', user_input)
+                    if m2:
+                        crop = m2.group(1).lower()
+
+            # Fallback to reasoner's crop only if we couldn't infer anything
             if not crop:
                 if isinstance(reasoner_data, dict):
                     crop = reasoner_data.get("crop") or reasoner_data.get("reasoner_output", {}).get("crop")
                 else:
                     crop = None
-            
+
             if not crop:
                 crop = "unknown"
             
             print(f"💰 PRICE AGENT NODE: crop={crop} (extracted from user_input)")
-            result = self.price_agent.process(crop)
+            # determine state/district if available from reasoner or user text
+            state_name = ""
+            district_name = ""
+            if isinstance(reasoner_data, dict):
+                state_name = reasoner_data.get("state", "") or ""
+                district_name = reasoner_data.get("district", "") or ""
+            # simple regex to pick up a district if user said "in <district>" and we
+            # didn't already have one
+            if not district_name:
+                m = re.search(r'in\s+([A-Za-z ]+)', user_input)
+                if m:
+                    candidate = m.group(1).strip()
+                    if 'price' not in candidate.lower():
+                        district_name = candidate
+            result = self.price_agent.process(crop, state_name, district_name)
             print(f"✅ PRICE AGENT NODE: result keys = {list(result.keys()) if isinstance(result, dict) else 'not a dict'}")
             
             # Log execution

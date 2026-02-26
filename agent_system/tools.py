@@ -4,7 +4,22 @@ import logging
 import re
 import requests
 from typing import Dict, Any, List, Optional
-from langchain_core.tools import tool
+
+# langchain_core may not be available in all environments; provide a
+# no-op decorator so tools can still be defined.
+try:
+    from langchain_core.tools import tool
+except ImportError:
+    def tool(func=None, **kwargs):
+        """Dummy @tool decorator when langchain_core isn't installed.
+        It simply returns the original function unchanged.
+        """
+        if func is None:
+            def _inner(f):
+                return f
+            return _inner
+        return func
+
 from config import MOCK_PRICE_DATA, REMEDIES_FILE, SCHEMES_FILE
 
 logger = logging.getLogger(__name__)
@@ -93,31 +108,36 @@ def remedy_tool(disease_name: str) -> str:
         return json.dumps({"error": f"Failed to load remedies: {e}"})
 
 @tool
-def price_tool(crop_name: str) -> str:
-    """Tool to get current market price information for a crop"""
+def price_tool(crop_name: str, state: str = "Kerala", district: str = "Ernakulam") -> str:
+    """
+    Tool to get current market price information for a crop with prediction and selling advice.
+    
+    Args:
+        crop_name: Name of the crop (e.g., 'tomato', 'apple', 'banana')
+        state: State name (default: Kerala). Used for web scraping and API queries
+        district: District name (default: Ernakulam). Used for web scraping and API queries
+    
+    Returns:
+        JSON string with current price, predicted price, and selling advice
+    """
     try:
-        crop_lower = crop_name.lower()
+        from agent_system.price_agent import PriceAgentNode
         
-        # Direct match in mock data
-        if crop_lower in MOCK_PRICE_DATA:
-            price_info = MOCK_PRICE_DATA[crop_lower]
-            # Add timestamp
-            from datetime import datetime
-            price_info["date"] = datetime.now().strftime("%Y-%m-%d")
-            return json.dumps(price_info)
+        agent = PriceAgentNode()
+        result = agent.process(
+            crop=crop_name,
+            state=state,
+            district=district
+        )
         
-        # Partial match
-        for key in MOCK_PRICE_DATA:
-            if key in crop_lower or crop_lower in key:
-                price_info = MOCK_PRICE_DATA[key]
-                from datetime import datetime
-                price_info["date"] = datetime.now().strftime("%Y-%m-%d")
-                return json.dumps(price_info)
-        
-        return json.dumps({"error": f"Price information not found for {crop_name}"})
+        return json.dumps(result)
     except Exception as e:
         logger.error(f"Price tool error: {e}")
-        return json.dumps({"error": str(e)})
+        return json.dumps({
+            "error": str(e),
+            "crop": crop_name,
+            "message": "Failed to fetch price information. Please try again later."
+        })
 
 @tool
 def get_current_location() -> str:

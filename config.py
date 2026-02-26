@@ -61,8 +61,8 @@ MOCK_PRICE_DATA = {
         "last_week_price": 1.43,
         "advice": "wait",
         "reasoning": "Stable prices, monitor for better opportunities"
-    }
-}
+    },
+  }
 
 # Agent configuration
 REASONER_SYSTEM_PROMPT = """You are an AI coordinator for AgriMitra, an agricultural assistance system. 

@@ -39,8 +39,15 @@ def test_individual_components():
     print("\n3. Testing Price Agent...")
     try:
         price_agent = PriceAgentNode()
-        result = price_agent.process("tomato")
-        print(f"✅ Price Agent works: {result.get('agent', 'unknown')}")
+        # basic call with only crop
+        r1 = price_agent.process("tomato")
+        print(f"   ✅ basic call: {r1.get('agent', 'unknown')} current={r1.get('current_price')}")
+        # call with state/district to exercise full signature
+        r2 = price_agent.process("beans", "Kerala", "Ernakulam")
+        print(f"   ✅ state/district call: price_agent returned crop={r2.get('crop')} price={r2.get('current_price')}")
+        print(f"      display name: {r2.get('commodity_display')}")
+        if r2.get('current_price') and '/kg/kg' in r2.get('current_price'):
+            print(f"      ⚠️ duplicated unit in current_price: {r2.get('current_price')}")
     except Exception as e:
         print(f"❌ Price Agent failed: {e}")
 
@@ -52,7 +59,8 @@ def test_full_workflow():
     test_queries = [
         "My tomato plants have yellow spots on leaves",
         "What's the current price of rice?",
-        "My wheat is sick and I want to know the market price"
+        "My wheat is sick and I want to know the market price",
+        "What's the price of beans in Ernakulam?",
     ]
     
     workflow = AgriMitraWorkflow()

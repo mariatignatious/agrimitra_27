@@ -34,7 +34,14 @@ function App() {
         });
 
         if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+          let text;
+          try {
+            text = await response.text();
+          } catch {
+            text = null;
+          }
+          const msg = `HTTP error! status: ${response.status}` + (text ? ` - ${text}` : '');
+          throw new Error(msg);
         }
 
         result = await response.json();
@@ -49,7 +56,15 @@ function App() {
         });
 
         if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+          // try to read error body for more context
+          let text;
+          try {
+            text = await response.text();
+          } catch {
+            text = null;
+          }
+          const msg = `HTTP error! status: ${response.status}` + (text ? ` - ${text}` : '');
+          throw new Error(msg);
         }
 
         result = await response.json();

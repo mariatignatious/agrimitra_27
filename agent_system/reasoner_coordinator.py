@@ -32,13 +32,22 @@ class ReasonerNode:
             logger.info(f"Reasoner output: {parsed_response}")
             print(f"🎯 REASONER: Intent={parsed_response.get('intent')}, Agents={parsed_response.get('agents_to_trigger')}, Crop={parsed_response.get('crop')}")
             
+            # sanitize crop: if model guessed a crop that doesn't appear in the text,
+            # ignore it so downstream logic can infer from the user_input itself.
+            crop_guess = parsed_response.get("crop")
+            if crop_guess and isinstance(crop_guess, str):
+                if crop_guess.lower() not in user_input.lower():
+                    logger.warning(f"Reasoner guessed crop '{crop_guess}' not in user input; discarding.")
+                    crop_guess = None
+                    parsed_response["crop"] = None
+            
             # If out_of_scope, ensure no next nodes
             next_nodes = parsed_response.get("agents_to_trigger", [])
             if parsed_response.get("intent") and "out_of_scope" in parsed_response.get("intent"):
                 next_nodes = []
             return {
                 "intent": parsed_response.get("intent", []),
-                "crop": parsed_response.get("crop"),
+                "crop": crop_guess,
                 "agents_to_trigger": next_nodes,
                 "reasoner_output": parsed_response,
                 "user_input": user_input,

@@ -77,9 +77,44 @@ function ResponseDisplay({ response, onQuery }) {
           />
         )}
 
-        {priceOutput && (
-          <PriceResponse output={priceOutput} />
-        )}
+        {/* PriceResponse: prefer structured priceOutput, fall back to parsing finalResponse text */}
+        {(() => {
+          let syntheticPriceOutput = priceOutput;
+          if (!syntheticPriceOutput && finalResponse && typeof finalResponse === 'string') {
+            // extract price / predicted price pairs from the text
+            const rupeeMatches = finalResponse.match(/₹\s*[0-9,]+(?:\.[0-9]+)?/g) || [];
+            const trendMatch = finalResponse.match(/\b(rising|falling|stable|rise|fall|increase|decrease|up|down)\b/i);
+            const sellAdviceMatch = finalResponse.match(/(sell|wait|better to sell|consider waiting)/i);
+            if (rupeeMatches.length > 0) {
+              const currentText = rupeeMatches[0].replace(/\s+/g, '');
+              let predicted = null;
+              if (rupeeMatches.length > 1) {
+                predicted = rupeeMatches[1].replace(/\s+/g, '');
+              }
+              syntheticPriceOutput = {
+                current_price: currentText,
+                predicted_price: predicted,
+                price_trend: trendMatch ? trendMatch[1].toLowerCase() : 'stable',
+                selling_advice: sellAdviceMatch ? sellAdviceMatch[0] : null,
+                market: ''
+              };
+              // try to parse header line for detail
+              const firstLine = finalResponse.split('\n')[0] || '';
+              const headerMatch = firstLine.match(/Price Update for ([^–]+)(?: – ([^,]+), ([^\*]+))?/i);
+              if (headerMatch) {
+                syntheticPriceOutput.commodity_display = headerMatch[1].trim();
+                if (headerMatch[2]) syntheticPriceOutput.district = headerMatch[2].trim();
+                if (headerMatch[3]) syntheticPriceOutput.state = headerMatch[3].trim();
+              }
+              // populate location from reasoner output if available (fallback)
+              if (reasonerOutput) {
+                if (!syntheticPriceOutput.state && reasonerOutput.state) syntheticPriceOutput.state = reasonerOutput.state;
+                if (!syntheticPriceOutput.district && reasonerOutput.district) syntheticPriceOutput.district = reasonerOutput.district;
+              }
+            }
+          }
+          return syntheticPriceOutput ? <PriceResponse output={syntheticPriceOutput} /> : null;
+        })()}
 
         {buyerConnectOutput && (
           <BuyerConnectResponse output={buyerConnectOutput} />

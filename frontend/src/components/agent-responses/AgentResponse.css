@@ -57,6 +57,49 @@
     margin: 0;
 }
 
+/* Price Response Specific */
+.price-card-main {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.price-display,
+.predicted-display {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+}
+
+.price-label {
+    font-weight: 500;
+    color: var(--text-light);
+}
+
+.predicted-display .price-value {
+    font-size: 1rem;
+    color: var(--text-dark);
+}
+
+.recommendation-card {
+    background: #fff8e1;
+    border-left: 4px solid var(--accent-color);
+    padding: 0.75rem 1rem;
+    border-radius: 8px;
+}
+.recommendation-card .section-title {
+    margin: 0 0 0.5rem 0;
+    font-size: 1rem;
+    color: var(--text-dark);
+}
+.recommendation-card .recommendation-text {
+    margin: 0;
+    font-size: 0.95rem;
+    color: var(--text-dark);
+}
+
+/* end price response specific */
+
 /* Schemes Grid */
 .schemes-grid {
     display: grid;
